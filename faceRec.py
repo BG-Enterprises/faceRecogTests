@@ -71,19 +71,14 @@ def checkAndRepairCameraConnection():
     global CAP,IP_ADDRESS,PORT
 
     CAMERA_CONNECTED = True
-    while(os.system("ping -c 1 " + IP_ADDRESS)!=0):
+    s = socket(AF_INET,SOCK_STREAM)
+    while(s.connect_ex((IP_ADDRESS,int(PORT)))!=0):
         CAMERA_CONNECTED = False
-        print("Camera Not Available , waiting for camera            ",CAP.isOpened())
+        print("Camera Not Available , waiting for camera ",CAP.isOpened())
         time.sleep(0.5)
 
     if(not(CAMERA_CONNECTED)): #If camera got disconnected in and reconnected
-        s = socket(AF_INET, SOCK_STREAM)
-        print("Camera found ")
-        while(s.connect_ex((IP_ADDRESS,int(PORT)))!=0): #waits till rtsp port gets opened
-            #https://www.tutorialspoint.com/python_penetration_testing/python_penetration_testing_network_scanner.htm
-            print("Waiting for camera to initialize")
-            time.sleep(0.5)
-        CAP = cv2.VideoCapture(source)
+       CAP = cv2.VideoCapture(source)
     else:
         time.sleep(0.5) # Some times the error will be cause only due to the buffer getting empty , so just waits for 0.5 secs
 def giveNewName():
@@ -118,7 +113,7 @@ frameSkipper(FPS,3)
 diff = 1.5
 while True:
     # Grab a single frame of video
-    frameSkipper(FPS,diff*2)
+    frameSkipper(FPS,diff*1.5)
     frame = resizeFramePropotionally(inpFrame,0.4)
     #ret, frame = video_capture.read()
 
