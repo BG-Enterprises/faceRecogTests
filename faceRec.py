@@ -1,3 +1,4 @@
+from socket import *
 import time
 import face_recognition
 import cv2
@@ -47,12 +48,18 @@ CHANNEL="1"
 source=f"rtsp://admin:ragavan20@{IP_ADDRESS}:{PORT}/cam/realmonitor?channel={CHANNEL}&subtype={MODE}"
 
 
-def resizeFramePropotionally(frame,numerator,denominator):
+def resizeFramePropotionally(frame,fraction):
     global MODE
     if (MODE=="1"):
         return frame.copy()
     else:
-        return cv2.resize(frame,((frame.shape[1]*numerator)//denominator,(frame.shape[0]*numerator)//denominator))
+        return cv2.resize(
+            frame,
+            (
+                int(frame.shape[1]*fraction),
+                int(frame.shape[0]*fraction)
+            )
+        )
 print("Accessing Camera")
 inpFrame = None
 CAP  = cv2.VideoCapture(source)
@@ -91,7 +98,7 @@ def frameSkipper(fps :int,sec:float)->None :
     #so through frame skipped we attempt to clear the queue of a few frames to get the latest frame
     global CAP,inpFrame,stopped
     while True :
-        for i in range(int(fps*sec//2)):
+        for i in range(int(fps*sec)):
             _,inpFrame=CAP.read()
             if(not _): # No frame received so calling camera checker
                 checkAndRepairCameraConnection()
@@ -108,10 +115,11 @@ face_names = []
 process_this_frame = True
 
 frameSkipper(FPS,3)
+diff = 1.5
 while True:
     # Grab a single frame of video
-    frameSkipper(FPS,1.5)
-    frame = resizeFramePropotionally(inpFrame,1,4)
+    frameSkipper(FPS,diff*2)
+    frame = resizeFramePropotionally(inpFrame,0.4)
     #ret, frame = video_capture.read()
 
     # Resize frame of video to 1/4 size for faster face recognition processing
@@ -121,7 +129,9 @@ while True:
     rgb_small_frame = small_frame[:, :, ::-1]
 
     # Only process every other frame of video to save time
-    if process_this_frame:
+    s = time.time()
+    if True :
+    #if process_this_frame:
         print("Running Recognition")
         # Find all the faces and face encodings in the current frame of video
         face_locations = face_recognition.face_locations(rgb_small_frame)
@@ -180,7 +190,7 @@ while True:
     if(face_names!=[]): 
         cv2.imwrite(giveNewName(),frame)
     cv2.imshow('Video', frame)
-
+    diff = time.time()-s
     # Hit 'q' on the keyboard to quit!
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
