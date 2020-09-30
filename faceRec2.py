@@ -47,6 +47,7 @@ MODE = str(0)
 CHANNEL="1"
 source=f"rtsp://admin:ragavan20@{IP_ADDRESS}:{PORT}/cam/realmonitor?channel={CHANNEL}&subtype={MODE}"
 
+faceCascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
 
 def resizeFramePropotionally(frame,fraction):
     global MODE
@@ -63,7 +64,7 @@ def resizeFramePropotionally(frame,fraction):
 print("Accessing Camera")
 inpFrame = None
 CAP  = cv2.VideoCapture(source)
-COMPRESSION = 0.4
+COMPRESSION = 0.27
 FPS = 15 if(MODE=="1") else 40
 firstFrame = None 
 initialized = False
@@ -103,6 +104,18 @@ def frameSkipper(fps :int,sec:float)->None :
             #IF Frames succefully skipped exit the loop
             break
     print("=")
+
+def getFaceLocations(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    # Detect the faces
+    faces = faceCascade.detectMultiScale(gray, 1.1, 4)
+    out = []
+    for(x,y,w,h) in faces :
+        out.append(
+                (y,x+w,y+h,x)
+        )
+    return out
+
 #
 # Initialize some variables
 face_locations = []
@@ -130,7 +143,8 @@ while True:
     #if process_this_frame:
         print("Running Recognition")
         # Find all the faces and face encodings in the current frame of video
-        face_locations = face_recognition.face_locations(rgb_small_frame)
+        #face_locations = face_recognition.face_locations(rgb_small_frame)
+        face_locations = getFaceLocations(rgb_small_frame)
         face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
         face_names = []
