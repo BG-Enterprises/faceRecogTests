@@ -5,6 +5,7 @@ import cv2
 import numpy as np
 import os
 from datetime import datetime
+import traceback
 print("Starting")
 # This is a demo of running face recognition on live video from your webcam. It's a little more complicated than the
 # other example, but it includes some basic performance tweaks to make things run a lot faster:
@@ -43,11 +44,12 @@ known_face_names = faceNames
 IP_ADDRESS = "192.168.0.2"
 PORT = "554"
 
-MODE = str(0)
+MODE = str(-1)
 CHANNEL="1"
 source=f"rtsp://admin:ragavan20@{IP_ADDRESS}:{PORT}/cam/realmonitor?channel={CHANNEL}&subtype={MODE}"
+source=0
 
-faceCascade = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
+faceCascade = cv2.CascadeClassifier('/home/pi/faceRecog/haarcascade_frontalface_default.xml')
 
 def resizeFramePropotionally(frame,fraction):
     global MODE
@@ -61,13 +63,20 @@ def resizeFramePropotionally(frame,fraction):
                 int(frame.shape[0]*fraction)
             )
         )
+
+def giveNewName():
+    path = "/home/pi/Desktop/FShots/"
+    return path+str(datetime.now()).split(".")[0].replace(" ","_")+".jpg"
+
 print("Accessing Camera")
 inpFrame = None
 CAP  = cv2.VideoCapture(source)
 COMPRESSION = 0.27
-FPS = 15 if(MODE=="1") else 40
+FPS = 15 if(MODE=="1" or MODE=="-1" ) else 40
 firstFrame = None 
 initialized = False
+fileOUT = open("/home/pi/Desktop/errorLogs","a+")
+fileOUT.write("\n\n"+"="*20+giveNewName())
 
 def checkAndRepairCameraConnection():
     global CAP,IP_ADDRESS,PORT
@@ -83,10 +92,6 @@ def checkAndRepairCameraConnection():
        CAP = cv2.VideoCapture(source)
     else:
         time.sleep(0.5) # Some times the error will be cause only due to the buffer getting empty , so just waits for 0.5 secs
-def giveNewName():
-    path = "/home/pi/Desktop/FShots/"
-    return path+str(datetime.now()).split(".")[0].replace(" ","_")+".jpg"
-
 
 
 def frameSkipper(fps :int,sec:float)->None :
@@ -94,8 +99,9 @@ def frameSkipper(fps :int,sec:float)->None :
     #it is implemented in Queue datatype which is not ideal to always get the latest frame 
     #so through frame skipped we attempt to clear the queue of a few frames to get the latest frame
     global CAP,inpFrame,stopped
+    jump = fps*sec if(MODE=="-1") else fps*sec//2
     while True :
-        for i in range(int(fps*sec)):
+        for i in range(int(jump)):
             _,inpFrame=CAP.read()
             if(not _): # No frame received so calling camera checker
                 checkAndRepairCameraConnection()
@@ -125,7 +131,10 @@ process_this_frame = True
 
 frameSkipper(FPS,3)
 diff = 1.5
-while True:
+
+saveCurrentFrame = False
+try:
+  while True:
     # Grab a single frame of video
     frameSkipper(FPS,diff*1.5)
     frame = resizeFramePropotionally(inpFrame,COMPRESSION)
@@ -148,6 +157,7 @@ while True:
         face_encodings = face_recognition.face_encodings(rgb_small_frame, face_locations)
 
         face_names = []
+        saveCurrentFrame = False
         for face_encoding in face_encodings:
             # See if the face is a match for the known face(s)
             matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
@@ -163,6 +173,7 @@ while True:
             best_match_index = np.argmin(face_distances)
             if matches[best_match_index]:
                 name = known_face_names[best_match_index]
+                saveCurrentFrame = True
             print(name)
             face_names.append(name)
 
@@ -197,14 +208,18 @@ while True:
         cv2.putText(frame, name, (left + 6, bottom - 6), font, 0.35, (255, 255, 255), 1)
         cv2.putText(frame,str(datetime.now().date()),(left+6,bottom+14),font,0.35,(255,255,255),1)
     # Display the resulting image
-    if(face_names!=[]): 
+    if(face_names!=[] and saveCurrentFrame): 
         cv2.imwrite(giveNewName(),frame)
     cv2.imshow('Video', frame)
     diff = time.time()-s
     # Hit 'q' on the keyboard to quit!
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
-
+except Exception as e :
+    exc = e
+    traceBack = traceback.format_exception(etype=type(exc),value=exc,tb=exc.__traceback__)
+    fileOUT.write("\n".join(traceBack))
+    fileOUT.flush()
 # Release handle to the webcam
 video_capture.release()
 cv2.destroyAllWindows()
