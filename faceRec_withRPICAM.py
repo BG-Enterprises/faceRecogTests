@@ -1,4 +1,6 @@
 from socket import *
+from picamera.array import PiRGBArray
+from picamera import PiCamera
 import time
 import face_recognition
 import cv2
@@ -6,6 +8,7 @@ import numpy as np
 import os
 from datetime import datetime
 import traceback
+import dlib
 print("Starting")
 # This is a demo of running face recognition on live video from your webcam. It's a little more complicated than the
 # other example, but it includes some basic performance tweaks to make things run a lot faster:
@@ -19,6 +22,7 @@ print("Starting")
 # Get a reference to webcam #0 (the default one)
 #video_capture = cv2.VideoCapture(0)
  
+detector = dlib.get_frontal_face_detector()
 faceImages = [
     "/home/pi/faceRecog/BG_APPA/1.jpeg",
     "/home/pi/faceRecog/BG_DM/1.jpeg",
@@ -45,10 +49,6 @@ IP_ADDRESS = "192.168.0.2"
 PORT = "554"
 
 MODE = str(-1)
-CHANNEL="1"
-source=f"rtsp://admin:ragavan20@{IP_ADDRESS}:{PORT}/cam/realmonitor?channel={CHANNEL}&subtype={MODE}"
-source=0
-
 faceCascade = cv2.CascadeClassifier('/home/pi/faceRecog/haarcascade_frontalface_default.xml')
 
 def resizeFramePropotionally(frame,fraction):
@@ -70,9 +70,11 @@ def giveNewName():
 
 print("Accessing Camera")
 inpFrame = None
+"""
 CAP  = cv2.VideoCapture(source)
-COMPRESSION = 0.6
+COMPRESSION = 0.27
 FPS = 15 if(MODE=="1" or MODE=="-1" ) else 40
+"""
 firstFrame = None 
 initialized = False
 fileOUT = open("/home/pi/Desktop/errorLogs","a+")
@@ -114,12 +116,22 @@ def frameSkipper(fps :int,sec:float)->None :
 def getFaceLocations(frame):
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # Detect the faces
+    #face_rects = detector(gray,0)
     faces = faceCascade.detectMultiScale(gray, 1.1, 4)
+
     out = []
+    """
+    for i,d in enumerate(face_rects):
+        out.append(
+                (d.top(),d.right(),d.bottom(),d.left())
+                )
+    """
+    
     for(x,y,w,h) in faces :
         out.append(
                 (y,x+w,y+h,x)
         )
+    
     return out
 
 #
@@ -129,15 +141,24 @@ face_encodings = []
 face_names = []
 process_this_frame = True
 
-frameSkipper(FPS,3)
+#frameSkipper(FPS,3)
 diff = 1.5
+
+camera = PiCamera()
+camera.resolution = (640, 480)
+camera.framerate = 32
+rawCapture = PiRGBArray(camera, size=(640, 480))
+COMPRESSION = 0.99
 
 saveCurrentFrame = False
 try:
-  while True:
+  for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+    inpFrame = frame.array
+    #print("In Here")
     # Grab a single frame of video
-    frameSkipper(FPS,diff*0.3)
+    #frameSkipper(FPS,diff*1.5)
     frame = resizeFramePropotionally(inpFrame,COMPRESSION)
+    rawCapture.truncate(0)
     #ret, frame = video_capture.read()
 
     # Resize frame of video to 1/4 size for faster face recognition processing
@@ -221,5 +242,5 @@ except Exception as e :
     fileOUT.write("\n".join(traceBack))
     fileOUT.flush()
 # Release handle to the webcam
-video_capture.release()
+#video_capture.release()
 cv2.destroyAllWindows()
